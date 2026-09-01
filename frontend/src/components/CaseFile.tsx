@@ -275,7 +275,7 @@ export function CaseFile({ detail }: { detail: VerdictDetail }) {
             </p>
           </Stage>
 
-          <Stage n="02" name="Investigator" role="builds the case" shown={revealed >= 2} active={playing && revealed === 2}>
+          <Stage n="02" name="The case for concern" role="builds the case" shown={revealed >= 2} active={playing && revealed === 2}>
             {investigator ? (
               <>
                 <p className="text-[13.5px] leading-relaxed text-bone">{investigator.argument}</p>
@@ -294,7 +294,7 @@ export function CaseFile({ detail }: { detail: VerdictDetail }) {
 
           <Stage
             n="03"
-            name="Skeptic"
+            name="The case against"
             role="argues the innocent case"
             shown={revealed >= 3}
             active={playing && revealed === 3}
@@ -324,7 +324,7 @@ export function CaseFile({ detail }: { detail: VerdictDetail }) {
 
           <Stage
             n="04"
-            name="Adjudicator"
+            name="Final call"
             role="rules between them"
             shown={revealed >= 4}
             active={playing && revealed === 4}
@@ -356,7 +356,12 @@ export function CaseFile({ detail }: { detail: VerdictDetail }) {
 
             {rejected && (
               <>
-                <p className="eyebrow mt-5 mb-2">Counter-argument it rejected</p>
+                <p
+                  className="eyebrow mt-5 mb-2"
+                  title="The system also considered a case for this NOT being a problem, and decided the evidence above outweighs it"
+                >
+                  The case against this call (considered, and outweighed)
+                </p>
                 <p className="text-[13px] leading-relaxed text-bone-dim border-l border-ground-700 pl-3.5">
                   {rejected}
                 </p>

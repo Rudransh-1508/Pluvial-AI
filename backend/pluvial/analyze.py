@@ -23,7 +23,7 @@ from pluvial.ingest import moisture_sync
 from pluvial.ingest.stations import nearest_station
 from pluvial.memory import dal
 from pluvial.mireye.client import MireyeClient, chunk_locations
-from pluvial.mireye.fields import ALL_FIELDS, is_soil_usable
+from pluvial.mireye.fields import ALL_FIELDS, classify_soil_usability, is_soil_usable
 from pluvial.mireye.profile_job import BatchLocationFailed, extract_batch_result
 
 NOMINATIM_ENDPOINT = "https://nominatim.openstreetmap.org/search"
@@ -158,9 +158,17 @@ def fetch_samples(
             values = extract_batch_result(result, strict=True)
             soil_usable = is_soil_usable(values)
             dal.record_sample_profile(con, sample_id, values, soil_usable, client.account.label)
+            # classify_soil_usability is additive to the stored boolean, not
+            # a replacement — it's never persisted, only handed to the
+            # agents in-process, and every real request today falls back to
+            # exactly `soil_usable` above (see fields.py: the field it needs
+            # isn't fetched yet).
+            usability = classify_soil_usability(values)
             record = {
                 "sample_id": sample_id, "lat": lat, "lon": lon,
                 "profile": values, "soil_usable": soil_usable,
+                "soil_usability": usability["status"],
+                "soil_usability_component": usability["component"],
             }
             fetched.append(record)
             if on_point:

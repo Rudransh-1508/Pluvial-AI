@@ -476,7 +476,7 @@ export function applyEvent(state: AnalysisState, event: StreamEvent): AnalysisSt
       let next = pushLane(credits, event.lane, {
         seq: entryKey(),
         kind: "veto",
-        text: "Honesty Gate: soil claim vetoed",
+        text: "Soil evidence blocked — can't be used here",
         detail: (p.reason as string) ?? undefined,
         sample_ids: sampleIds,
       });

@@ -51,6 +51,15 @@ def summarise_sample(sample: dict[str, Any]) -> dict[str, Any]:
         "lat": round(sample["lat"], 6),
         "lon": round(sample["lon"], 6),
         "soil_usable": sample.get("soil_usable"),
+        # "usable" | "partial" | "unusable" — richer than soil_usable above,
+        # but agrees with it exactly whenever soil_usability == "partial"
+        # cannot occur (which is every point today; see fields.py on why
+        # soil_component_breakdown isn't fetched yet). "partial" means: the
+        # named component below may be cited, attributed to it by name and
+        # percentage, capped below 'high' severity — never treat it as
+        # equivalent to a fully usable point.
+        "soil_usability": sample.get("soil_usability", "usable" if sample.get("soil_usable") else "unusable"),
+        "soil_usability_component": sample.get("soil_usability_component"),
         "soil_map_unit_name": _unwrap(profile, "soil_map_unit_name"),
         "soil_shrink_swell_class": _unwrap(profile, "soil_shrink_swell_class"),
         "soil_drainage_class": _unwrap(profile, "soil_drainage_class"),
@@ -60,6 +69,14 @@ def summarise_sample(sample: dict[str, Any]) -> dict[str, Any]:
         "in_karst_area": _unwrap(profile, "in_karst_area"),
         "karst_exposure_class": _unwrap(profile, "karst_exposure_class"),
         "elevation": _unwrap(profile, "elevation"),
+        # Land-cover corroboration, independent of SSURGO — real evidence
+        # of what's physically at this point today, not how it was mapped.
+        # Most useful exactly where soil_usability is "unusable": a soil
+        # label says "Urban land" but land_use_class/lcms_class can still
+        # show this specific point isn't actually developed/impervious.
+        "land_use_class": _unwrap(profile, "land_use_class"),
+        "lcms_class": _unwrap(profile, "lcms_class"),
+        "tree_canopy_pct": _unwrap(profile, "tree_canopy_pct"),
     }
 
 
@@ -104,6 +121,8 @@ def sample_detail(wrapper: RunContextWrapper[AddressContext], sample_id: int) ->
             "lat": sample["lat"],
             "lon": sample["lon"],
             "soil_usable": sample.get("soil_usable"),
+            "soil_usability": sample.get("soil_usability", "usable" if sample.get("soil_usable") else "unusable"),
+            "soil_usability_component": sample.get("soil_usability_component"),
             "profile": sample.get("profile") or {},
         },
         default=str,

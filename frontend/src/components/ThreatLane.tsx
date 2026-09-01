@@ -10,6 +10,15 @@ export const THREAT_LABEL: Record<Threat, string> = {
   subsidence: "Subsidence",
 };
 
+/* Plain-English framing of what each lane is actually deciding, shown in
+   place of the raw field-name list — a reader shouldn't need to know what
+   "shrink-swell" means to know why this lane exists. */
+export const THREAT_QUESTION: Record<Threat, string> = {
+  foundation: "Could the ground swell or shrink enough to crack the foundation?",
+  service_lines: "Could shifting soil damage the pipes running to this property?",
+  subsidence: "Could the ground sink or collapse under this property?",
+};
+
 export const THREAT_MECHANISM: Record<Threat, string> = {
   foundation: "shrink-swell · bedrock depth · trigger state",
   service_lines: "shrink-swell · erodibility · drainage",
@@ -19,17 +28,70 @@ export const THREAT_MECHANISM: Record<Threat, string> = {
 /* `unresolved` is deliberately not styled as an absence. It is an assertive
    finding — no soil answer exists at these points — and greying it out would
    read as "we didn't get to this one". */
-const SEVERITY_STYLE: Record<Severity, { dot: string; text: string; label: string }> = {
-  high: { dot: "bg-oxide", text: "text-oxide-bright", label: "High" },
-  elevated: { dot: "bg-ochre", text: "text-ochre", label: "Elevated" },
-  low: { dot: "bg-moisture", text: "text-moisture", label: "Low" },
-  unresolved: { dot: "bg-clay-light", text: "text-clay-light", label: "Unresolved" },
+const SEVERITY_STYLE: Record<
+  Severity,
+  { dot: string; text: string; label: string; fill: string; meaning: string }
+> = {
+  high: {
+    dot: "bg-oxide",
+    text: "text-oxide-bright",
+    label: "High risk",
+    fill: "bg-oxide",
+    meaning: "Strong evidence this is happening now — worth acting on.",
+  },
+  elevated: {
+    dot: "bg-ochre",
+    text: "text-ochre",
+    label: "Some risk",
+    fill: "bg-ochre",
+    meaning: "Real but partial evidence — worth keeping an eye on.",
+  },
+  low: {
+    dot: "bg-moisture",
+    text: "text-moisture",
+    label: "Low risk",
+    fill: "bg-moisture",
+    meaning: "Evidence points away from a problem here.",
+  },
+  unresolved: {
+    dot: "bg-clay-light",
+    text: "text-clay-light",
+    label: "Can't tell yet",
+    fill: "bg-clay-light",
+    meaning: "The data needed to decide this isn't available — not a clean bill of health.",
+  },
 };
 
+/* Order matters here: it's the left-to-right position on the meter below. */
+const SEVERITY_ORDER: Severity[] = ["low", "elevated", "high", "unresolved"];
+
+function SeverityMeter({ severity }: { severity: Severity }) {
+  const style = SEVERITY_STYLE[severity];
+  const idx = SEVERITY_ORDER.indexOf(severity);
+  return (
+    <div className="flex items-center gap-1.5" title={style.meaning}>
+      <div className="flex items-center gap-0.5" aria-hidden>
+        {SEVERITY_ORDER.map((s, i) => (
+          <span
+            key={s}
+            className={`h-1.5 w-3.5 rounded-sm ${i <= idx && s !== "unresolved" ? style.fill : "bg-ground-700"} ${
+              severity === "unresolved" && s === "unresolved" ? style.fill : ""
+            }`}
+          />
+        ))}
+      </div>
+      <span className={`flex items-center gap-1 text-[12px] ${style.text}`}>
+        <span className={`h-2 w-2 rounded-full ${style.dot}`} aria-hidden />
+        {style.label}
+      </span>
+    </div>
+  );
+}
+
 const STAGE_LABEL: Record<string, string> = {
-  investigator: "Investigator building the case",
-  skeptic: "Skeptic testing it",
-  adjudicator: "Adjudicator ruling",
+  investigator: "Building the case that there's a problem",
+  skeptic: "Checking whether that case holds up",
+  adjudicator: "Weighing both sides — final call",
 };
 
 function EntryRow({
@@ -63,12 +125,15 @@ function EntryRow({
 
   if (entry.kind === "veto") {
     return (
-      <li className="animate-rise my-1.5 rounded border border-oxide/45 bg-oxide/10 p-2.5">
-        <div className="flex items-center gap-2 text-[12.5px] text-oxide-bright">
+      <li className="animate-rise my-1.5 rounded border border-oxide/45 bg-oxide/10 p-3">
+        <div className="flex items-center gap-2 text-[13px] text-oxide-bright">
           <span aria-hidden>✕</span>
           <span className="font-medium">{entry.text}</span>
         </div>
-        {entry.detail && <p className="mt-1 text-[12.5px] leading-snug text-bone-dim">{entry.detail}</p>}
+        <p className="mt-1 text-[12px] uppercase tracking-wide text-bone-faint">
+          A rule stops the system from using this evidence, even though it was collected.
+        </p>
+        {entry.detail && <p className="mt-1.5 text-[13px] leading-relaxed text-bone-dim">{entry.detail}</p>}
         {ids.length > 0 && (
           <div className="mt-1.5 flex flex-wrap gap-1">
             {ids.map((id) => (
@@ -164,8 +229,6 @@ export function ThreatLane({
     if (el) el.scrollTop = el.scrollHeight;
   }, [lane.entries.length, lane.ruling]);
 
-  const severity = lane.ruling ? SEVERITY_STYLE[lane.ruling.severity] : null;
-
   return (
     <section
       className={[
@@ -197,22 +260,32 @@ export function ThreatLane({
                 ▶
               </span>
             )}
-            <h3 className="display text-[15px] text-bone">{THREAT_LABEL[lane.threat]}</h3>
+            <h3 className="display text-[16px] text-bone">{THREAT_LABEL[lane.threat]}</h3>
           </div>
-          {severity ? (
-            <span className={`flex items-center gap-1.5 text-[12px] ${severity.text}`}>
-              <span className={`h-2 w-2 rounded-full ${severity.dot}`} aria-hidden />
-              {severity.label}
+          {lane.ruling ? (
+            <span className="flex items-center gap-2">
+              {lane.ruling.partial_soil_basis && (
+                <span
+                  className="data rounded-sm border border-clay-light/50 px-1.5 py-px text-[9.5px] uppercase tracking-wider text-clay-light"
+                  title="This reading covers only part of the ground here — see the explanation below for how much"
+                >
+                  partial reading
+                </span>
+              )}
+              <SeverityMeter severity={lane.ruling.severity} />
             </span>
           ) : lane.stage ? (
             <span className="eyebrow animate-pulse" style={{ color: "var(--moisture)" }}>
-              {lane.stage}
+              {STAGE_LABEL[lane.stage] ?? lane.stage}
             </span>
           ) : (
             <span className="eyebrow">waiting</span>
           )}
         </div>
-        <p className="data mt-1 text-[11px] text-bone-faint">{THREAT_MECHANISM[lane.threat]}</p>
+        <p className="mt-1.5 text-[13px] leading-snug text-bone-dim">{THREAT_QUESTION[lane.threat]}</p>
+        <p className="data mt-1 text-[10.5px] text-bone-faint" title="The technical signals this lane checks">
+          {THREAT_MECHANISM[lane.threat]}
+        </p>
       </header>
 
       {/* Evidence trail — expanded lanes get generous space, collapsed lanes
@@ -254,17 +327,23 @@ export function ThreatLane({
         <div
           className={[
             "min-h-0 overflow-y-auto border-t border-ground-700 px-3.5 py-3 transition-all duration-300",
-            isExpanded ? "max-h-60" : "max-h-20",
+            isExpanded ? "max-h-[32rem]" : "max-h-24",
           ].join(" ")}
         >
-          <p className="text-[13px] leading-snug text-bone">{lane.ruling.explanation}</p>
+          {lane.ruling.severity === "unresolved" && (
+            <p className="mb-2.5 rounded border border-clay-light/40 bg-clay-light/[0.08] px-2.5 py-2 text-[12.5px] leading-relaxed text-clay-light">
+              This isn&apos;t a clean bill of health — it means the system doesn&apos;t have enough
+              evidence to say either way.
+            </p>
+          )}
+          <p className="text-sm leading-relaxed text-bone">{lane.ruling.explanation}</p>
 
           {isExpanded && lane.ruling.unknowns.length > 0 && (
-            <div className="mt-2.5">
-              <p className="eyebrow">What is unknown</p>
-              <ul className="mt-1 space-y-1">
+            <div className="mt-3">
+              <p className="eyebrow">What we don&apos;t know yet</p>
+              <ul className="mt-1.5 space-y-1">
                 {lane.ruling.unknowns.map((u, i) => (
-                  <li key={i} className="text-[12.5px] leading-snug text-clay-light">
+                  <li key={i} className="text-[13px] leading-relaxed text-clay-light">
                     {u}
                   </li>
                 ))}
@@ -273,18 +352,20 @@ export function ThreatLane({
           )}
 
           {isExpanded && lane.ruling.rejected_counter_argument && (
-            <div className="mt-2.5">
-              <p className="eyebrow">Rejected counter-argument</p>
-              <p className="mt-1 text-[12.5px] leading-snug text-bone-dim">
+            <div className="mt-3">
+              <p className="eyebrow" title="The system also considered a case for this NOT being a problem, and decided the evidence above outweighs it">
+                The case against this ruling (considered, and outweighed)
+              </p>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-bone-dim">
                 {lane.ruling.rejected_counter_argument}
               </p>
             </div>
           )}
 
           {isExpanded && lane.ruling.invalidation_condition && (
-            <div className="mt-2.5">
-              <p className="eyebrow">Reopens if</p>
-              <p className="mt-1 text-[12.5px] leading-snug text-moisture">
+            <div className="mt-3">
+              <p className="eyebrow">This changes if</p>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-moisture">
                 {lane.ruling.invalidation_condition.plain_english}
               </p>
             </div>

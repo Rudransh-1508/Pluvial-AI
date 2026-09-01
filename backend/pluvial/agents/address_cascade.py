@@ -101,12 +101,35 @@ exactly what nine points exist to detect, and differential movement across
 a boundary is what actually breaks things. Use compare_samples and cite
 both sample_ids.
 
-If soil_usable is False at a point, do not make a shrink-swell, drainage,
-erodibility or hydrologic-group claim from that point. Use a different
-point that has one, or argue from karst, bedrock depth, elevation and the
-trigger state, which do not depend on an SSURGO component. If no point
-supports your case, say so — an argument built on ground you have no data
-for is worse than no argument.
+Each point's soil_usability is "usable", "partial", or "unusable" — read
+it, not the older soil_usable boolean, which collapses "partial" into
+something that looks fully usable.
+
+If soil_usability is "unusable" at a point, do not make a shrink-swell,
+drainage, erodibility or hydrologic-group claim from that point. Use a
+different point that has one, or argue from karst, bedrock depth,
+elevation and the trigger state, which do not depend on an SSURGO
+component. If no point supports your case, say so — an argument built on
+ground you have no data for is worse than no argument.
+
+land_use_class, lcms_class and tree_canopy_pct are also independent of
+SSURGO — USFS land-cover, not soil survey — and are worth citing at an
+"unusable" point precisely because "Urban land" describes how the point
+was originally mapped, not what is physically there today. If lcms_class
+reads Trees, Shrubs or Grass/Forb/Herb rather than "Barren or Impervious",
+or tree_canopy_pct is meaningfully non-zero, that is real, citable evidence
+the ground may be less disturbed than the soil label implies. This is
+never a soil claim and the Honesty Gate does not apply to it — cite it on
+its own terms, the same as karst or bedrock depth.
+
+If soil_usability is "partial" at a point, soil_usability_component names
+the specific non-urban SSURGO component you may cite (its own name,
+percentage share, and its own shrink-swell/drainage/erodibility/hydrologic-
+group values) — but you must attribute the claim to that component by name
+and percentage, not to the map unit as a whole. "The 40% Denver-series
+component reads Moderate shrink-swell" is a valid claim at a partial
+point; "this map unit reads Moderate shrink-swell" is not, because most of
+the map unit is unmapped fill with no reading at all.
 """
 
 SKEPTIC_ROLE = """
@@ -117,11 +140,31 @@ overreached.
 Your lines of attack, in order of strength:
 - The Honesty Gate. If the Investigator built a claim on a soil-derived
   field (shrink-swell, available water capacity, drainage, erodibility,
-  hydrologic group) at a point where soil_usable is False, set
+  hydrologic group) at a point where soil_usability is "unusable", set
   soil_claim_vetoed=True, list those sample_ids in vetoed_sample_ids, and
   explain what is actually unknown there. This vetoes those claims, not
   necessarily the whole case: karst, bedrock depth and consequence fields
   survive the gate.
+- Minority-component scrutiny. If soil_usability is "partial" at a point,
+  the Investigator's claim is NOT auto-vetoed — but it rests on only part
+  of the ground (soil_usability_component names the share). Your job here
+  is proportionality, not rejection: is that percentage a strong enough
+  basis to trust, or is the Investigator overreaching from a minority
+  reading the same way a raw shrink-swell class overreaches when points
+  disagree? Argue it on the numbers, the same way you argue uniformity
+  below. You may still set soil_claim_vetoed=True on a partial point if the
+  Investigator misattributed the claim to the whole map unit rather than
+  to the named component specifically — that IS the Honesty Gate firing,
+  just on a different failure than "unusable".
+- Land cover as it actually cuts. lcms_class/land_use_class/tree_canopy_pct
+  are independent of SSURGO and can argue either direction — use whichever
+  the evidence supports. If lcms_class reads "Barren or Impervious" at an
+  "unusable" point, that corroborates the soil label rather than
+  undermining it: the ground genuinely is built/paved, and any Investigator
+  argument leaning on land cover to soften the soil veto is wrong to make.
+  If it instead reads Trees/Shrubs/Grass, that is real evidence the Investigator
+  may fairly use, and you should not dismiss it just because it isn't a
+  soil field — it is not covered by the Honesty Gate at all.
 - Uniformity. If every sampled point agrees, differential movement — the
   mechanism that actually breaks things — is much less likely than a raw
   shrink-swell class suggests. Use compare_samples to show it.
@@ -159,15 +202,35 @@ instead depends on what survived the veto:
 
 - If measured non-soil evidence supports a finding — in_karst_area and
   karst_exposure_class (USGS karst mapping, not an SSURGO component),
-  bedrock_depth_cm, elevation, the regional trigger state — rule on that
-  evidence, at `high` or `elevated` as it warrants, and say explicitly in
-  the explanation that the soil-derived contribution could not be measured.
-  Discarding a real karst reading to return `unresolved` throws away an
-  answer someone paid for.
+  bedrock_depth_cm, elevation, the regional trigger state, or land cover
+  (land_use_class, lcms_class, tree_canopy_pct — USFS, independent of
+  SSURGO) — rule on that evidence, at `high` or `elevated` as it warrants,
+  and say explicitly in the explanation that the soil-derived contribution
+  could not be measured. Discarding a real karst reading, or a real land-
+  cover reading, to return `unresolved` throws away an answer someone paid
+  for. Land cover cuts both ways: "Barren or Impervious" corroborates the
+  soil veto and supports ruling on the mechanism as if the ground were
+  disturbed; Trees/Shrubs/Grass argues the opposite, that the point may be
+  less disturbed than "Urban land" implies, and can support a lower
+  severity than the raw soil label alone would suggest.
 - If nothing survived, rule `unresolved`.
 
 `unresolved` states that no answer exists at these points. It is a finding,
 not a failure, and it must be as specific as any other ruling.
+
+MANDATORY, when decisive_evidence rests on a "partial" soil_usability
+point (a minority non-urban SSURGO component, not the full map unit): set
+partial_soil_basis=True, and you may NOT rule `high` — cap at `elevated`
+even if the cited component's own class would otherwise read as severe. A
+minority share of the ground under this property is not "the evidence is
+specific to this ground" (the definition of `high` above); it is real
+evidence, but of only part of the ground. State the percentage basis
+explicitly in `explanation` — e.g. "based on the 40% Denver-series
+component; the remaining 60% of this map unit has no soil reading."
+Leave partial_soil_basis False in every other case, including when
+soil_claim_vetoed fully vetoed the soil evidence and the ruling rests on
+non-soil evidence instead — that path is covered by the paragraph above,
+not this one.
 
 When severity is `unresolved`, `unknowns` is required: name exactly what is
 unknown and what evidence would settle it (for example, a geotechnical

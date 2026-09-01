@@ -157,3 +157,9 @@ class ThreatRuling(BaseModel):
         "evidence would settle it. An unresolved ruling with no unknowns is a shrug, not an answer.",
     )
     explanation: str = Field(description="Plain-English summary of this ruling for the person who asked")
+    partial_soil_basis: bool = Field(
+        default=False,
+        description="True when decisive_evidence rests on a minority (non-dominant) SSURGO component "
+        "rather than the full map unit — design spec 2026-08-30. Severity may not be 'high' when true. "
+        "Defaults False and stays False everywhere until soil_component_breakdown is actually available.",
+    )

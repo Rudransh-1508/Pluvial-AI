@@ -16,15 +16,44 @@ import { streamEvents } from "@/lib/stream";
    addresses that resolve well would make the coverage boundary look like an
    accident when a reviewer's own address hits it.
 
-   Brenham is small-town Texas on real SSURGO soil. Bowling Green sits on
-   Kentucky karst: the soil gate fires at all nine points and the rulings
-   still land, because karst mapping is not SSURGO and survives the veto.
-   Golden and Kingwood are the honest failure mode. */
-const EXAMPLES = [
-  { label: "Brenham, TX", value: "100 W Alamo St, Brenham, TX", note: "soil resolves at all 9 points" },
-  { label: "Bowling Green, KY", value: "1001 College St, Bowling Green, KY", note: "karst; soil gate fires, rulings still land" },
-  { label: "Golden, CO", value: "1200 Washington Ave, Golden, CO", note: "urban core; unresolved" },
-  { label: "Kingwood, TX", value: "1000 Kingwood Drive, Kingwood, TX", note: "suburban but mapped Urban land" },
+   Brenham and Grinnell are ordinary small-town America on real, usable
+   SSURGO soil — one comes back low risk everywhere, the other comes back
+   real risk everywhere, so "it resolves" doesn't quietly mean "it's fine".
+   Bowling Green sits on Kentucky karst: the soil gate fires at all nine
+   points and the rulings still land, because karst mapping is not SSURGO
+   and survives the veto. Golden and Kingwood are the honest failure mode —
+   dense/suburban land mapped as Urban land, soil claims vetoed outright. */
+const EXAMPLES: { label: string; value: string; note: string; outcome: "resolves" | "unresolved" }[] = [
+  {
+    label: "Brenham, TX",
+    value: "100 W Alamo St, Brenham, TX",
+    note: "soil resolves at all 9 points — low risk across all three lanes",
+    outcome: "resolves",
+  },
+  {
+    label: "Grinnell, IA",
+    value: "1013 Broad St, Grinnell, IA",
+    note: "soil resolves at all 9 points — real risk across all three lanes",
+    outcome: "resolves",
+  },
+  {
+    label: "Bowling Green, KY",
+    value: "1001 College St, Bowling Green, KY",
+    note: "karst; soil gate fires, rulings still land",
+    outcome: "resolves",
+  },
+  {
+    label: "Golden, CO",
+    value: "1200 Washington Ave, Golden, CO",
+    note: "urban core; soil claims vetoed, unresolved",
+    outcome: "unresolved",
+  },
+  {
+    label: "Kingwood, TX",
+    value: "1000 Kingwood Drive, Kingwood, TX",
+    note: "suburban but mapped Urban land; unresolved",
+    outcome: "unresolved",
+  },
 ];
 
 function CreditCounter({ spent, quoted }: { spent: number; quoted: number | null }) {
@@ -273,7 +302,7 @@ export function AddressConsole({ locationId }: { locationId?: number }) {
           </button>
         </form>
 
-        <div className="mx-auto mt-2.5 flex w-full max-w-7xl flex-wrap items-center gap-x-3 gap-y-1.5">
+        <div className="mx-auto mt-2.5 flex w-full max-w-7xl flex-wrap items-center gap-x-4 gap-y-1.5">
           <span className="eyebrow">try</span>
           {EXAMPLES.map((ex) => (
             <button
@@ -284,11 +313,27 @@ export function AddressConsole({ locationId }: { locationId?: number }) {
                 setAddress(ex.value);
                 doPlan(ex.value);
               }}
-              className="text-[12.5px] text-bone-dim underline decoration-ground-700 underline-offset-4 transition-colors hover:text-bone"
+              className="flex items-center gap-1.5 text-[12.5px] text-bone-dim underline decoration-ground-700 underline-offset-4 transition-colors hover:text-bone"
             >
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${
+                  ex.outcome === "resolves" ? "bg-moisture" : "bg-clay-light"
+                }`}
+                aria-hidden
+              />
               {ex.label}
             </button>
           ))}
+          <span className="data flex items-center gap-3 text-[10.5px] text-bone-faint">
+            <span className="flex items-center gap-1">
+              <span className="h-1.5 w-1.5 rounded-full bg-moisture" aria-hidden />
+              resolves
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="h-1.5 w-1.5 rounded-full bg-clay-light" aria-hidden />
+              honesty-gated
+            </span>
+          </span>
         </div>
 
         {planError && <p className="mx-auto mt-2 w-full max-w-7xl text-[13px] text-oxide-bright">{planError}</p>}
@@ -364,8 +409,8 @@ export function AddressConsole({ locationId }: { locationId?: number }) {
         <div className="flex flex-col gap-3 border-t border-ground-700 p-3 lg:border-l lg:border-t-0">
           {state.triage && (
             <div className="rounded-lg border border-ground-700 bg-ground-850 px-3.5 py-2.5">
-              <p className="eyebrow">triage · {state.triage.decision}</p>
-              <p className="mt-1 text-[12.5px] leading-snug text-bone-dim">{state.triage.reason}</p>
+              <p className="eyebrow">first read · {state.triage.decision}</p>
+              <p className="mt-1 text-[12.5px] leading-relaxed text-bone-dim">{state.triage.reason}</p>
             </div>
           )}
 
@@ -383,9 +428,26 @@ export function AddressConsole({ locationId }: { locationId?: number }) {
             </div>
           )}
 
+          {/* Bottom-line summary, up top and always visible — a reader
+              should never have to scroll past three evidence trails just to
+              learn whether anything is actually wrong. */}
+          {state.finished && <VerdictSummary state={state} />}
+
+          {/* The chat lives here, not below the map, precisely so it's on
+              screen the moment the rulings land instead of after a scroll. */}
+          <ChatComposer
+            turns={turns}
+            quote={quote}
+            busy={chatBusy}
+            disabled={!state.finished}
+            onSend={sendChat}
+            onConfirm={confirmQuote}
+            onDismissQuote={() => setQuote(null)}
+          />
+
           {/* Agent lanes — expanded lane gets flex-[3], others get flex-1.
               All lanes remain visible; only the proportional size changes. */}
-          <div className="flex flex-col gap-3" style={{ minHeight: "calc(100dvh - 280px)" }}>
+          <div className="flex flex-col gap-3" style={{ minHeight: "calc(100dvh - 480px)" }}>
             {THREATS.map((threat) => (
               <ThreatLane
                 key={threat}
@@ -398,30 +460,42 @@ export function AddressConsole({ locationId }: { locationId?: number }) {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
 
-      {/* ── chat + summary (full width, below the map/lanes grid) ──── */}
-      <div className="border-t border-ground-700 p-3 sm:p-5 lg:px-8">
-        <div className="mx-auto max-w-4xl space-y-4">
-          <ChatComposer
-            turns={turns}
-            quote={quote}
-            busy={chatBusy}
-            disabled={!state.finished}
-            onSend={sendChat}
-            onConfirm={confirmQuote}
-            onDismissQuote={() => setQuote(null)}
-          />
+const SEVERITY_SUMMARY: Record<string, { label: string; cls: string; dot: string }> = {
+  high: { label: "High risk", cls: "text-oxide-bright", dot: "bg-oxide" },
+  elevated: { label: "Some risk", cls: "text-ochre", dot: "bg-ochre" },
+  low: { label: "Low risk", cls: "text-moisture", dot: "bg-moisture" },
+  unresolved: { label: "Can't tell yet", cls: "text-clay-light", dot: "bg-clay-light" },
+};
 
-          {state.finished && (
-            <p className="data text-center text-[11.5px] text-bone-faint">
-              {THREATS.map((t) => `${THREAT_LABEL[t]}: ${state.lanes[t].ruling?.severity ?? "—"}`).join(
-                " · ",
-              )}{" "}
-              · {state.creditsSpent} credits spent
-            </p>
-          )}
-        </div>
+/* Three colored rows a reader can scan in two seconds, instead of a single
+   dense sentence of "foundation: high · service_lines: low · …" that reads
+   like a log line rather than an answer. */
+function VerdictSummary({ state }: { state: AnalysisState }) {
+  return (
+    <div className="rounded-lg border border-ground-700 bg-ground-850 px-3.5 py-3">
+      <p className="eyebrow mb-2.5">The bottom line</p>
+      <div className="space-y-1.5">
+        {THREATS.map((t) => {
+          const severity = state.lanes[t].ruling?.severity ?? "unresolved";
+          const s = SEVERITY_SUMMARY[severity];
+          return (
+            <div key={t} className="flex items-center justify-between gap-3">
+              <span className="text-[13px] text-bone">{THREAT_LABEL[t]}</span>
+              <span className={`flex items-center gap-1.5 text-[12.5px] font-medium ${s.cls}`}>
+                <span className={`h-2 w-2 rounded-full ${s.dot}`} aria-hidden />
+                {s.label}
+              </span>
+            </div>
+          );
+        })}
       </div>
+      <p className="data mt-2.5 border-t border-ground-700 pt-2 text-[11px] text-bone-faint">
+        {state.creditsSpent} credits spent
+      </p>
     </div>
   );
 }

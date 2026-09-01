@@ -39,6 +39,11 @@ export interface ThreatRuling {
   invalidation_condition: AddressInvalidationCondition | null;
   unknowns: string[];
   explanation: string;
+  /** True when decisive_evidence rests on a minority (non-dominant) SSURGO
+   *  component rather than the full map unit — design spec 2026-08-30.
+   *  Always false today: the backend field it depends on isn't fetched
+   *  from Mireye yet, so no live ruling can set this true. */
+  partial_soil_basis?: boolean;
 }
 
 export interface PlannedSample {

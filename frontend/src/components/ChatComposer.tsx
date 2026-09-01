@@ -8,6 +8,63 @@ export interface ChatTurn {
   text: string;
 }
 
+/* The chat model writes in light markdown — **bold** and "- " bullets — and
+   nothing here ever rendered it, so replies showed literal asterisks and
+   dashes. This covers exactly what the model actually produces; it is not a
+   general markdown renderer. */
+function renderInline(text: string, keyPrefix: string) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
+  return parts.map((part, i) =>
+    part.startsWith("**") && part.endsWith("**") ? (
+      <strong key={`${keyPrefix}-${i}`} className="font-semibold text-bone">
+        {part.slice(2, -2)}
+      </strong>
+    ) : (
+      <span key={`${keyPrefix}-${i}`}>{part}</span>
+    ),
+  );
+}
+
+function ChatText({ text }: { text: string }) {
+  const lines = text.split("\n");
+  const blocks: { type: "p" | "ul"; lines: string[] }[] = [];
+  for (const line of lines) {
+    const isBullet = /^\s*[-•]\s+/.test(line);
+    if (line.trim() === "") continue;
+    const last = blocks[blocks.length - 1];
+    if (isBullet) {
+      const item = line.replace(/^\s*[-•]\s+/, "");
+      if (last?.type === "ul") last.lines.push(item);
+      else blocks.push({ type: "ul", lines: [item] });
+    } else {
+      if (last?.type === "p") last.lines.push(line);
+      else blocks.push({ type: "p", lines: [line] });
+    }
+  }
+  return (
+    <>
+      {blocks.map((block, i) =>
+        block.type === "ul" ? (
+          <ul key={i} className="my-1.5 list-disc space-y-1 pl-4">
+            {block.lines.map((line, j) => (
+              <li key={j}>{renderInline(line, `${i}-${j}`)}</li>
+            ))}
+          </ul>
+        ) : (
+          <p key={i} className={i > 0 ? "mt-1.5" : undefined}>
+            {block.lines.map((line, j) => (
+              <span key={j}>
+                {j > 0 && <br />}
+                {renderInline(line, `${i}-${j}`)}
+              </span>
+            ))}
+          </p>
+        ),
+      )}
+    </>
+  );
+}
+
 export interface PendingQuote {
   pending_id: string;
   kind: "sample_point" | "analyze_location";
@@ -95,7 +152,7 @@ export function ChatComposer({
       </header>
 
       {turns.length > 0 && (
-        <div ref={scroller} className="max-h-56 min-h-0 flex-1 space-y-2 overflow-y-auto px-3.5 py-2.5">
+        <div ref={scroller} className="max-h-96 min-h-0 flex-1 space-y-2.5 overflow-y-auto px-3.5 py-2.5">
           {turns.map((turn) => (
             <div
               key={turn.id}
@@ -106,11 +163,11 @@ export function ChatComposer({
                     ? "data pl-2.5 text-[12px] text-bone-faint"
                     : turn.side === "system"
                       ? "pl-2.5 text-[12.5px] text-moisture"
-                      : "border-l-2 border-moisture/50 pl-2.5 text-[13px] leading-snug text-bone-dim"
+                      : "border-l-2 border-moisture/50 pl-2.5 text-[13px] leading-relaxed text-bone-dim"
               }
             >
               {turn.side === "tool" && <span aria-hidden>▸ </span>}
-              {turn.text}
+              {turn.side === "assistant" ? <ChatText text={turn.text} /> : turn.text}
             </div>
           ))}
           {quote && (
